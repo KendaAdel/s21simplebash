@@ -1,58 +1,68 @@
+#define _GNU_SOURCE
 #include "s21_cat.h"
 
 int main(int argc, char *argv[]) {
-  flags flags = {0};
-  if (parser(argc, argv, &flags)) {
-    readFile(argc, argv, &flags);
+  flags flag = {0};
+  if (parser(argc, argv, &flag)) {
+    read(argc, argv, &flag);
   }
+  return 0;
 }
 
-bool parser(int argc, char **argv, flags *flags) {
-  int opt;
+bool parser(int argc, char *argv[], flags *flag) {
+  int rez;
   bool result = true;
   bool exit_proces = false;
-  struct option long_option[] = {{"number-nonblank", no_argument, NULL, 'b'},
-                                 {"number", no_argument, NULL, 'n'},
-                                 {"squeeze-blank", no_argument, NULL, 's'},
-                                 {0, 0, 0, 0}};
-  while (!exit_proces &&
-         (opt = getopt_long(argc, argv, "benstETv", long_option, NULL)) != -1) {
-    switch (opt) {
+  const char *short_options = "benstvTE";
+
+  const struct option long_options[] = {
+      {"number-nonblank", no_argument, NULL, 'b'},
+      {"show-ends", no_argument, NULL, 'E'},
+      {"number", no_argument, NULL, 'n'},
+      {"squeeze-blank", no_argument, NULL, 's'},
+      {"show-tabs", no_argument, NULL, 'T'},
+      {"show-nonprinting", no_argument, NULL, 'v'},
+      {0, 0, 0, 0}};
+  while (!exit_proces && (rez = getopt_long(argc, argv, short_options,
+                                            long_options, NULL)) != -1) {
+    switch (rez) {
       case 'b':
-        flags->b = true;
+        flag->b = true;
         break;
       case 'e':
-        flags->e = true;
-        flags->v = true;
+        flag->e = flag->v = true;
         break;
       case 'n':
-        flags->n = true;
+        flag->n = true;
         break;
       case 's':
-        flags->s = true;
+        flag->s = true;
         break;
       case 't':
-        flags->t = true;
-        flags->v = true;
-        break;
-      case 'E':
-        flags->e = true;
-        break;
-      case 'T':
-        flags->t = true;
+        flag->t = flag->v = true;
         break;
       case 'v':
-        flags->v = true;
+        flag->v = 1;
+        break;
+      case 'T':
+        flag->T = 1;
+        break;
+      case 'E':
+        flag->E = 1;
         break;
       default:
-        fprintf(stderr, "cat: invalid option -- '%c'\n", opt);
         exit_proces = true;
         result = false;
     }
-    if (result == false) {
-      exit_proces = true;
-    }
-    if (flags->b) flags->n = false;
+  }
+  if (flag->b == true) flag->n = false;
+  if (flag->e == true) flag->v = true;
+  if (flag->E == true) flag->v = false;
+  if (flag->T == true) flag->v = flag->t = true;
+
+  if (optind >= argc) {
+    fprintf(stderr, "Error: file not specified for reading\n");
+    return false;
   }
   return result;
 }
@@ -72,53 +82,57 @@ void v_print(unsigned char c) {
   }
 }
 
-void readFile(int argc, char **argv, flags *flags) {
-  for (flags->countFile = optind; flags->countFile < argc; flags->countFile++) {
-    FILE *fp = fopen(argv[flags->countFile], "r");
-    if (fp == NULL)
+void read(int argc, char *argv[], flags *flag) {
+  for (flag->countFile = optind; flag->countFile < argc; flag->countFile++) {
+    FILE *file = fopen(argv[flag->countFile], "r");
+    if (file == NULL) {
       perror("Error opening file");
-    else
-      work(flags, fp);
+      continue;
+    } else {
+      tput(flag, file);
+    }
   }
 }
-
-void work(flags *flags, FILE *fp) {
-  int c;
+void tput(flags *flag, FILE *file) {
+  int letter = '\0';
   bool myflag = false;
-  int count = (flags->countFile - optind) ? 0 : 1;
-  while ((c = fgetc(fp)) != EOF) {
-    if (flags->s) {
-      if (c == '\n') {
+  int count = (flag->countFile - optind) ? 0 : 1;
+  while ((letter = fgetc(file)) != EOF) {
+    if (ferror(file)) {
+      perror("Error reading file");
+      break;
+    }
+    if (flag->s) {
+      if (letter == '\n') {
         if (count >= 2) continue;
         count++;
       } else {
         count = 0;
       }
     }
-    if (flags->n && (!flags->lineNumber || myflag){
-      
-      printf("%6d\t", ++flags->lineNumber);
-      myflag = false;}
-    
-        if flags->b && (myflag || !flags->lineNumber) && c != '\n')) {
-      printf("%6d\t", ++flags->lineNumber);
+    if (flag->n && (!flag->lineNumber || myflag) || letter == '\0') {
+      printf("%6d\t", ++flag->lineNumber);
       myflag = false;
     }
-    if (flags->e && c == '\n') {
+    if (flag->b && (myflag || !flag->lineNumber) && letter != '\n') {
+      printf("%6d\t", ++flag->lineNumber);
+      myflag = false;
+    }
+    if ((flag->E || flag->e) && letter == '\n') {
       putchar('$');
     }
-    if (flags->t && c == '\t') {
+    if (flag->t && letter == '\t') {
       printf("^I");
       continue;
     }
-    if (c == '\n') {
+    if (letter == '\n') {
       myflag = true;
     }
-    if (flags->v) {
-      v_print(c);
+    if (flag->v) {
+      v_print(letter);
     } else {
-      putchar(c);
+      putchar(letter);
     }
   }
-  fclose(fp);
+  fclose(file);
 }
