@@ -95,8 +95,12 @@ void work(flags *flags, FILE *fp) {
         count = 0;
       }
     }
-    if ((flags->n && (!flags->lineNumber || myflag)) ||
-        (flags->b && (myflag || !flags->lineNumber) && c != '\n')) {
+    if (flags->n && (!flags->lineNumber || myflag){
+      
+      printf("%6d\t", ++flags->lineNumber);
+      myflag = false;}
+    
+        if flags->b && (myflag || !flags->lineNumber) && c != '\n')) {
       printf("%6d\t", ++flags->lineNumber);
       myflag = false;
     }
